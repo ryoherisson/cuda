@@ -103,3 +103,14 @@ void compare_results(int gpu_result, int cpu_result) {
 
   printf("GPU and CPU results are different \n");
 }
+
+void print_time_using_host_clock(clock_t start, clock_t end) {
+  printf("GPU kernel execution time : %4.6f \n",
+         (double)((double)(end - start) / CLOCKS_PER_SEC));
+}
+
+void sum_array_cpu(float *a, float *b, float *c, int size) {
+  for (int i = 0; i < size; i++) {
+    c[i] = a[i] + b[i];
+  }
+}

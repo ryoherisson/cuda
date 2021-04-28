@@ -34,4 +34,9 @@ void compare_arrays(int *a, int *b, int size);
 
 void compare_arrays(float *a, float *b, int size);
 
+void sum_array_cpu(float *a, float *b, float *c, int size);
+
+// print_time_using_host_clock
+void print_time_using_host_clock(clock_t start, clock_t end);
+
 #endif // !COMMON_H

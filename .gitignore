@@ -30,3 +30,6 @@
 *.exe
 *.out
 *.app
+
+# Codes
+CUDA_C_J_Samples
