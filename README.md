@@ -44,3 +44,8 @@ $ nvprof --print-gpu-trace ./a.out
 ```bash
 $ nvcc -Xptxas -dlcm=ca -o ./a.out misaligned_read.cu
 ```
+
+# IMage Process with opencv
+```bash
+$ nvcc sample.cu `pkg-config opencv --cflags --libs` -ccbin g++-8
+```
