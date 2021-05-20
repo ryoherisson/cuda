@@ -49,6 +49,25 @@ int main(int argc, char* const argv[]) {
     cpu_end = seconds();
     std::cout << "CPU time: " << cpu_end - cpu_start << std::endl;
 
+
+    // OpenCV CUDA
+    cv::cuda::GpuMat dst, src;
+    src.upload(img_orig);
+
+    double cvcuda_start, cvcuda_end;
+    cvcuda_start = seconds();
+    cv::cuda::cvtColor(src, dst, cv::COLOR_BGR2GRAY);
+    cvcuda_end = seconds();
+
+    std::cout << "OpenCV CUDA time: " << cvcuda_end - cvcuda_start << std::endl;
+
+    cv::Mat cvcuda_img_out(height, width, CV_8UC1);
+    dst.download(cvcuda_img_out);
+
+    // save kernel result
+    cv::imwrite("./images/q2_grayscale_cvcuda.jpg", cvcuda_img_out);
+
+
     // GPU
     // host array
     uchar3* host_img_color = new uchar3 [width * height];
