@@ -3,14 +3,13 @@
 
 #include "../common/common.h"
 
-__global__ void binarize(uchar3* color, unsigned char* gray, int threashold) {
+__global__ void binarize(uchar3* color, unsigned char* gray, unsigned char threshold) {
 
     unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-    gray[idx] = (unsigned char)(0.299f*(float)color[idx].x
+    gray[idx] = (unsigned char)((0.299f*(float)color[idx].x
                 + 0.587f * (float)color[idx].y
-                + 0.114f * (float)color[idx].z) / threashold;
-
+                + 0.114f * (float)color[idx].z) / (float)threshold) * 255;
 }
 
 int main(int argc, char* const argv[]) {
@@ -34,7 +33,7 @@ int main(int argc, char* const argv[]) {
     cv::Mat gpu_img_out(height, width, CV_8UC1);
 
     // threshold
-    int threashold = 127;
+    const unsigned char threashold = 127;
 
     // CPU
     // execution time mesuring in CPU
