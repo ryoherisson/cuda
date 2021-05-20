@@ -48,15 +48,15 @@ int main(int argc, char* const argv[]) {
     cv::Mat img_orig;
     img_orig = cv::imread("../../data/cat.jpg", 1);
 
-    int width = img_orig.cols;
-    int height = img_orig.rows;
-
     // check data
     if (!img_orig.data)
     {
         printf("No image data \n");
         return -1;
     }
+
+    int width = img_orig.cols;
+    int height = img_orig.rows;
 
     cv::Mat host_img_out(height, width, CV_8UC3);
     cv::Mat gpu_img_out(height, width, CV_8UC3);
