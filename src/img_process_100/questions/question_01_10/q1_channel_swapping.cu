@@ -66,7 +66,7 @@ int main(int argc, char* const argv[]) {
     double cpu_start, cpu_end;
     cpu_start = seconds();
     RGBToBGRHost(img_orig, host_img_out);
-    cv::imwrite("./images/channel_swapping_cpu.jpg", host_img_out);
+    cv::imwrite("./images/q1_channel_swapping_cpu.jpg", host_img_out);
     cpu_end = seconds();
     std::cout << "CPU time: " << cpu_end - cpu_start << std::endl;
 
@@ -95,7 +95,7 @@ int main(int argc, char* const argv[]) {
     CHECK(cudaMemcpy(gpu_img_out.data, device_img, sizeof(uint8_t) * n_bytes, cudaMemcpyDeviceToHost));
 
     // save kernel result
-    cv::imwrite("./images/channel_swapping_gpu.jpg", gpu_img_out);
+    cv::imwrite("./images/q1_channel_swapping_gpu.jpg", gpu_img_out);
 
     // free device global memory
     CHECK(cudaFree(device_img));
