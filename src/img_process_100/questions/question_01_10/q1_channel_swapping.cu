@@ -48,6 +48,9 @@ int main(int argc, char* const argv[]) {
     cv::Mat img_orig;
     img_orig = cv::imread("../../data/cat.jpg", 1);
 
+    int width = img_orig.cols;
+    int height = img_orig.rows;
+
     // check data
     if (!img_orig.data)
     {
@@ -55,8 +58,8 @@ int main(int argc, char* const argv[]) {
         return -1;
     }
 
-    cv::Mat host_img_out(img_orig.rows, img_orig.cols, CV_8UC3);
-    cv::Mat gpu_img_out(img_orig.rows, img_orig.cols, CV_8UC3);
+    cv::Mat host_img_out(height, width, CV_8UC3);
+    cv::Mat gpu_img_out(height, width, CV_8UC3);
 
     // CPU
     // execution time mesuring in CPU
@@ -69,7 +72,7 @@ int main(int argc, char* const argv[]) {
 
     // GPU
     // malloc device global memory
-    const int n_bytes = img_orig.step * img_orig.rows;
+    const int n_bytes = img_orig.step * height;
     uint8_t *device_img;
     CHECK(cudaMalloc((uint8_t **)&device_img, sizeof(uint8_t) * n_bytes));
 
@@ -77,12 +80,12 @@ int main(int argc, char* const argv[]) {
     CHECK(cudaMemcpy(device_img, img_orig.data, sizeof(uint8_t) * n_bytes, cudaMemcpyHostToDevice));
 
     dim3 block(16, 16);
-    dim3 grid((img_orig.cols + block.x - 1) / block.x, (img_orig.rows + block.y - 1) / block.y);
+    dim3 grid((width + block.x - 1) / block.x, (height + block.y - 1) / block.y);
 
     // execution time mesuring in GPU
     double gpu_start, gpu_end;
     gpu_start = seconds();
-    RGBToBGRDevice<<<grid, block>>>(device_img, img_orig.cols, img_orig.rows, img_orig.step);
+    RGBToBGRDevice<<<grid, block>>>(device_img, width, height, img_orig.step);
     CHECK(cudaDeviceSynchronize());
     gpu_end = seconds();
 
