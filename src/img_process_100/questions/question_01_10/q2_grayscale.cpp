@@ -30,6 +30,7 @@ int main(int argc, char* const argv[]) {
     int height = img_orig.rows;
 
     cv::Mat host_img_out(height, width, CV_8UC1);
+    cv::Mat cvcuda_img_out(height, width, CV_8UC1);
     cv::Mat gpu_img_out(height, width, CV_8UC1);
 
     // CPU
@@ -53,7 +54,6 @@ int main(int argc, char* const argv[]) {
 
     std::cout << "OpenCV CUDA time: " << cvcuda_end - cvcuda_start << std::endl;
 
-    cv::Mat cvcuda_img_out(height, width, CV_8UC1);
     dst.download(cvcuda_img_out);
 
     // save kernel result
