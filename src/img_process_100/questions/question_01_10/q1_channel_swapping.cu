@@ -24,7 +24,6 @@ __global__ void RGBToBGRDevice(uint8_t* input, const int width, const int height
         input[color_tid + 0] = input[color_tid + 2];
         input[color_tid + 2] = t;
     }
-
 }
 
 void RGBToBGRHost(cv::Mat& img, cv::Mat& img_out) {
