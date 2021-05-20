@@ -93,7 +93,7 @@ int main(int argc, char* const argv[]) {
     CHECK(cudaDeviceSynchronize());
     gpu_end = seconds();
 
-    std::cout << "GPU time: " << gpu_end - gpu_start << std::endl;
+    std::cout << std::fixed << std::setprecision(6) << "GPU time: " << gpu_end - gpu_start << std::endl;
 
     // copy kernel result back to host side
     CHECK(cudaMemcpy(host_img_gray, device_img_gray, sizeof(unsigned char) * n_bytes, cudaMemcpyDeviceToHost));
