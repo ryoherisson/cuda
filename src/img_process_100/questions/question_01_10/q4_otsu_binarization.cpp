@@ -3,20 +3,72 @@
 
 #include "../common/common.h"
 
-__global__ void binarize(uchar3* color, unsigned char* gray, unsigned char threshold) {
+// histogram statistics
+__global__ void histInDevice(unsigned char* data, int* hist, int width, int height) {
+    int ix = threadIdx.x + blockIdx.x * blockDim.x;
+    int iy = threadIdx.y + blockIdx.y * blockDim.y;
 
-    unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (ix < width && iy < height) {
+        atomicAdd(&hist[data[iy * width + ix]], 1);
+    }
+}
 
-    gray[idx] = (unsigned char)((0.299f*(float)color[idx].x
-                + 0.587f * (float)color[idx].y
-                + 0.114f * (float)color[idx].z) / (float)threshold) * 255;
+// maximum between-class variance
+__global__ void OTSUthresh(const int* hist, float* sum, float*s, float* n, float* val, int width, int height, int* OtsuThresh) {
+    if (blockIdx.x == 0) {
+        int idx = threadIdx.x;
+        atomicAdd(&sum[0], hist[idx] * idx);
+    }
+    else {
+        int idx = threadIdx.x;
+        if (idx < blockIdx.x) {
+            atomicAdd(&s[blockIdx.x - 1], hist[idx] * idx);
+            atomicAdd(&n[blockIdx.x - 1], hist[idx]);
+        }
+    }
+    __syncthreads(); // All threads are synchronized
+    if (blockIdx.x > 0) {
+        int idx = blockIdx.x - 1;
+        float u = sum[0] / (width * height);
+        float w0 = n[idx] / (width * height);
+        float u0 = s[idx] / n[idx];
+        if (w0 == 1) {
+            val[idx] = 0;
+        } else {
+            val[idx] = (u - u0) * (u - u0) * w0 / (1 - w0);
+        }
+    }
+
+    __syncthreads(); // All threads are synchronized
+    if (threadIdx.x == 0 && blockIdx.x == 0) {
+        float maxval = 0;
+        for (int i = 0; i < 256; i++) {
+            if (val[i] > maxval) {
+                maxval = val[i];
+                OtsuThresh[0] = i;
+                OtsuThresh[1] = val[i];
+            }
+        }
+    }
+}
+
+// thresholding
+__global__ void OTSUInDevice(unsigned char* data_in, unsigned char* data_out, int width, int height, int* h_thresh) {
+    int ix = threadIdx.x + blockIdx.x * blockDim.x;
+    int iy = threadIdx.y + blockIdx.y * blockDim.y;
+
+    if (ix < width && iy < height) {
+        if (data_in[iy * width + ix] > h_thresh[0]) {
+            data_out[iy * width + ix] = 255;
+        }
+    }
 }
 
 int main(int argc, char* const argv[]) {
 
-    // read image
+    // read image with gray
     cv::Mat img_orig;
-    img_orig = cv::imread("../../data/cat.jpg", 1);
+    img_orig = cv::imread("../../data/cat.jpg", 0);
 
     // check data
     if (!img_orig.data)
@@ -29,94 +81,81 @@ int main(int argc, char* const argv[]) {
     int height = img_orig.rows;
 
     cv::Mat host_img_out(height, width, CV_8UC1);
-    cv::Mat cvcuda_img_out(height, width, CV_8UC1);
     cv::Mat gpu_img_out(height, width, CV_8UC1);
-
-    // threshold
-    const unsigned char threashold = 127;
 
     // CPU
     // execution time mesuring in CPU
-    cv::Mat host_gray(height, width, CV_8UC1);
-
     double cpu_start, cpu_end;
     cpu_start = seconds();
-    cv::cvtColor(img_orig, host_gray, cv::COLOR_BGR2GRAY);
-    cv::threshold(host_gray, host_img_out, threashold, 255, cv::THRESH_BINARY);
-    cv::imwrite("./images/q3_binarization_cpu.jpg", host_img_out);
+    cv::threshold(img_orig, host_img_out, 0, 255, cv::THRESH_OTSU);
+    cv::imwrite("./images/q4_otsu_binarization_cpu.jpg", host_img_out);
     cpu_end = seconds();
     std::cout << "CPU time: " << cpu_end - cpu_start << std::endl;
 
 
     // OpenCV CUDA
-    cv::cuda::GpuMat dst, mid, src;
-    src.upload(img_orig);
-
-    double cvcuda_start, cvcuda_end;
-    cvcuda_start = seconds();
-    cv::cuda::cvtColor(src, mid, cv::COLOR_BGR2GRAY);
-    cv::cuda::threshold(mid, dst, threashold, 255, cv::THRESH_BINARY);
-    cvcuda_end = seconds();
-
-    std::cout << "OpenCV CUDA time: " << cvcuda_end - cvcuda_start << std::endl;
-
-    dst.download(cvcuda_img_out);
-
-    // save kernel result
-    cv::imwrite("./images/q3_binarization_cvcuda.jpg", cvcuda_img_out);
-
+    // => THRESH_OTSU is not supported
 
     // GPU
-    // host array
-    uchar3* host_img_color = new uchar3 [width * height];
-    unsigned char* host_img_binary = new unsigned char [width * height];
-
-    // host image to 1 array
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            host_img_color[x + y * width]
-             = make_uchar3(img_orig.at<cv::Vec3b>(y, x)[2], img_orig.at<cv::Vec3b>(y, x)[1], img_orig.at<cv::Vec3b>(y, x)[0]);
-        }
-    }
-
     // malloc device global memory
     const int n_bytes = width * height;
-    uchar3 *device_img_color;
-    unsigned char* device_img_binary;
-    CHECK(cudaMalloc((void **)&device_img_color, sizeof(uchar3) * n_bytes));
-    CHECK(cudaMalloc((void **)&device_img_binary, sizeof(unsigned char) * n_bytes));
+    unsigned char* d_in;
+    int* d_hist;
+    CHECK(cudaMalloc((void **)&d_in, sizeof(unsigned char) * n_bytes));
+    CHECK(cudaMalloc((void **)&d_hist, 256 * sizeof(int)));
 
     // transfer data from host to device
-    CHECK(cudaMemcpy(device_img_color, host_img_color, sizeof(uchar3) * n_bytes, cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(d_in, img_orig.data, sizeof(unsigned char) * n_bytes, cudaMemcpyHostToDevice));
 
-    dim3 block(32);
-    dim3 grid((width * height + block.x - 1) / block.x);
+    // Otsu Threshold
+    float* d_sum;
+    float* d_s;
+    float* d_n;
+    float* d_val;
+    int* d_thresh;
+    unsigned char* d_out;
+
+    CHECK(cudaMalloc((void **)&d_sum, sizeof(float)));
+    CHECK(cudaMalloc((void **)&d_s, sizeof(float) * 256));
+    CHECK(cudaMalloc((void **)&d_n, sizeof(float) * 256));
+    CHECK(cudaMalloc((void **)&d_val, sizeof(float) * 256));
+    CHECK(cudaMalloc((void **)&d_thresh, sizeof(int) * 2));
+    CHECK(cudaMalloc((void **)&d_out, sizeof(unsigned char) * n_bytes));
+
+    dim3 block1(32, 32);
+    dim3 grid1((width + block1.x - 1) / block1.x, (height + block1.y - 1) / block1.y);
+
+    dim3 block2(256, 1);
+    dim3 grid2(257, 1);
 
     // execution time mesuring in GPU
     double gpu_start, gpu_end;
     gpu_start = seconds();
-    binarize<<<grid, block>>>(device_img_color, device_img_binary, threashold);
+    histInDevice<<<grid1, block1>>>(d_in, d_hist, width, height);
     CHECK(cudaDeviceSynchronize());
+
+    OTSUthresh<<<grid2, block2>>>(d_hist, d_sum, d_s, d_n, d_val, width, height, d_thresh);
+    OTSUInDevice <<<grid1, block1>>>(d_in, d_out, width, height, d_thresh);
+
     gpu_end = seconds();
 
     std::cout << std::fixed << std::setprecision(6) << "GPU time: " << gpu_end - gpu_start << std::endl;
 
     // copy kernel result back to host side
-    CHECK(cudaMemcpy(host_img_binary, device_img_binary, sizeof(unsigned char) * n_bytes, cudaMemcpyDeviceToHost));
-
-    // Results
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            gpu_img_out.at<unsigned char>(y, x) = host_img_binary[x + y * width];
-        }
-    }
+    CHECK(cudaMemcpy(gpu_img_out.data, d_out, sizeof(unsigned char) * n_bytes, cudaMemcpyDeviceToHost));
 
     // save kernel result
-    cv::imwrite("./images/q3_binarization_gpu.jpg", gpu_img_out);
+    cv::imwrite("./images/q4_otsu_binarization_gpu.jpg", gpu_img_out);
 
-    // free device global memory
-    CHECK(cudaFree(device_img_color));
-    CHECK(cudaFree(device_img_binary));
+    // // free device global memory
+    CHECK(cudaFree(d_in));
+    CHECK(cudaFree(d_out));
+    CHECK(cudaFree(d_hist));
+    CHECK(cudaFree(d_sum));
+    CHECK(cudaFree(d_s));
+    CHECK(cudaFree(d_n));
+    CHECK(cudaFree(d_val));
+    CHECK(cudaFree(d_thresh));
 
     return 0;
 }
