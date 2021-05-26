@@ -60,6 +60,33 @@ void csr_format(const matrix& M) {
     printVector(row_ptr, (char*)"row_ptr = ");
 }
 
+// Generate the three vectors val, row_ind, col_ptr
+void csc_format(const matrix& M) {
+    int m = M.size();
+    int n = M[0].size(), i, j;
+    vi val;
+    vi row_ind;
+    vi col_ptr = { 0 };
+    int nnz = 0;
+
+    for (int j = 0; j < n; j++) {
+        for (int i = 0; i < m; i++) {
+            if (M[i][j] != 0) {
+                val.push_back(M[i][j]);
+                row_ind.push_back(i);
+
+                nnz++;
+            }
+        }
+        col_ptr.push_back(nnz);
+    }
+
+    printMatrix(M);
+    printVector(val, (char*)"val = ");;
+    printVector(row_ind, (char*)"row_ind = ");
+    printVector(col_ptr, (char*)"col_ptr = ");
+}
+
 int main(int argc, char* argv[]) {
     matrix M = {
         { 0, 0, 0, 0, 1 },
@@ -68,7 +95,13 @@ int main(int argc, char* argv[]) {
         { 0, 6, 0, 0, 1 },
     };
 
+    std::cout << "CSR format" << std::endl;
     csr_format(M);
+
+    std::cout << std::endl;
+
+    std::cout << "CSC format" << std::endl;
+    csc_format(M);
 
     return 0;
 }
