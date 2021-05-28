@@ -132,7 +132,7 @@ void csr_format_host(float *A, float **val, int **row_ptr, int **col_ind, int nn
 }
 
 
-void csr_spmv_host(const float *val, const int *row_ptr, const int *col_ind, int N, const float* x, float **outY)
+void csr_spmv_host(float *val, int *row_ptr, int *col_ind, int N, float* x, float **outY)
 {
     float *Y = (float *)malloc(sizeof(float) * N);
 
