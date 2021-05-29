@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <cusparse_v2.h>
+#include <cublas_v2.h>
 #include <cuda.h>
 #include <iostream>
 
@@ -156,8 +157,8 @@ int main(int argc, char **argv)
     int *dCsrRowPtrA;
     int *dCsrColIndA;
     int totalNnz;
-    float alpha = 3.0f;
-    float beta = 4.0f;
+    float alpha = 1.0f;
+    float beta = 0.0f;
     float *dX, *X;
     float *dY, *Y;
     cusparseHandle_t handle = 0;
@@ -197,6 +198,53 @@ int main(int argc, char **argv)
     // ---------------------------------
     // SpMV on Device
     // ---------------------------------
+
+    /*
+    cuBLAS
+    */
+    float *dbA;
+    float *dbX;
+    float *bY, *dbY;
+    cublasHandle_t handleb = 0;
+
+    // generate inputs
+    generate_random_vector(M, &bY);
+
+    // Create the cuBLAS handle
+    CHECK_CUBLAS(cublasCreate(&handleb));
+
+    // Allocate device memory
+    CHECK(cudaMalloc((void **)&dbA, sizeof(float) * M * N));
+    CHECK(cudaMalloc((void **)&dbX, sizeof(float) * N));
+    CHECK(cudaMalloc((void **)&dbY, sizeof(float) * M));
+
+    // Transfer inputs to the device
+    CHECK_CUBLAS(cublasSetVector(N, sizeof(float), X, 1, dbX, 1));
+    CHECK_CUBLAS(cublasSetVector(M, sizeof(float), Y, 1, dbY, 1));
+    CHECK_CUBLAS(cublasSetMatrix(M, N, sizeof(float), A, M, dbA, M));
+
+    // Calculate execution time
+    double device_b_start, device_b_end;
+    device_b_start = seconds();
+    // Execute the matrix-vector multiplication
+    CHECK_CUBLAS(cublasSgemv(handleb, CUBLAS_OP_N, M, N, &alpha, dbA, M, dbX, 1,
+                             &beta, dbY, 1));
+    device_b_end = seconds();
+
+    // Retrieve the output vector from the device
+    CHECK_CUBLAS(cublasGetVector(M, sizeof(float), dbY, 1, bY, 1));
+    // Check Result on Device
+    printf("Result on cuBlas\n");
+    for (row = 0; row < 5; row++)
+    {
+        printf("%2.2f\n", bY[row]);
+    }
+
+    printf("...\n");
+
+    /*
+    cuSparse
+    */
 
     // Create the cuSPARSE handle
     CHECK_CUSPARSE(cusparseCreate(&handle));
@@ -261,7 +309,7 @@ int main(int argc, char **argv)
 
     printf("...\n");
 
-    printf("Exectution time Host: %.6f, Device: %.6f\n", host_end-host_start, device_end - device_start);
+    printf("Exectution time Host: %.6f, cuBlas: %.6f, cuSparse: %.6f\n", host_end-host_start, device_b_end-device_b_start, device_end-device_start);
 
     // Check if results of host and device are same
     checkResult(hY, Y, N);
