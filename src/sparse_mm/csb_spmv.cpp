@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <vector>
 
@@ -29,17 +30,34 @@ void printVector(const vi& V, char* msg) {
     std::cout << "]" << std::endl;
 }
 
+void csb_format(const matrix& M) {
+    int m = M.size();
+    int n = M[0].size(), i, j;
+    vi val;
+    vi blk_row_ind;
+    vi blk_col_ind;
+    vi blk_ptr = { 0 };
+    int nnz = 0;
+
+    int blk_m = std::sqrt((double)m);
+    int blk_n = std::sqrt((double)n);
+
+
+
+
+}
+
 
 int main(int argc, char* argv[]) {
     matrix M = {
-        { 0, 0, 0, 0, 1, 2 },
-        { 5, 8, 0, 0, 0, 4 },
-        { 0, 0, 3, 0, 0, 0 },
-        { 0, 6, 0, 0, 1, 7 },
+        { 0, 0, 0, 0 },
+        { 5, 8, 0, 0 },
+        { 0, 0, 3, 0 },
+        { 0, 6, 0, 0 },
     };
 
     std::cout << "CSB format" << std::endl;
-    csr_format(M);
+    csb_format(M);
 
     std::cout << std::endl;
 
