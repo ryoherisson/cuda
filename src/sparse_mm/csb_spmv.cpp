@@ -47,6 +47,17 @@ void csb_format(const matrix& M) {
 
 }
 
+void CSBSpMV(const matrix& A, vector x, vector y) {
+
+}
+
+void CSBBlockRowV(const matrix& A, int i, vector R, vector x, vector y) {
+
+}
+
+void CSBBlockV(const matrix& A, int start, int end, int dim, vector x, vector y) {
+
+}
 
 int main(int argc, char* argv[]) {
     matrix M = {
